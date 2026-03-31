@@ -1,12 +1,16 @@
-const PIPED_INSTANCES = [
-  'https://pipedapi.kavin.rocks',
-  'https://pipedapi.adminforge.de',
-  'https://pipedapi.leptons.xyz',
+const INVIDIOUS_INSTANCES = [
+  'https://inv.nadeko.net',
+  'https://invidious.nerdvpn.de',
+  'https://invidious.jing.rocks',
+  'https://vid.puffyan.us',
+  'https://invidious.privacyredirect.com',
 ];
 const COBALT_API = 'https://api.cobalt.tools';
 
-interface PipedResult {
-  items?: Array<{ type: string; url: string }>;
+interface InvidiousResult {
+  type: string;
+  videoId: string;
+  title: string;
 }
 
 interface CobaltResult {
@@ -18,20 +22,24 @@ interface CobaltResult {
 async function searchYouTube(query: string): Promise<string> {
   let lastError = '';
 
-  for (const api of PIPED_INSTANCES) {
+  for (const api of INVIDIOUS_INSTANCES) {
     try {
-      const res = await fetch(`${api}/search?q=${encodeURIComponent(query)}&filter=music_songs`);
+      const res = await fetch(
+        `${api}/api/v1/search?q=${encodeURIComponent(query)}&type=video`,
+        { headers: { 'Accept': 'application/json' } }
+      );
       if (!res.ok) {
         lastError = `${api} returned ${res.status}`;
         continue;
       }
-      const data = (await res.json()) as PipedResult;
-      const items = data.items?.filter((i) => i.type === 'stream');
-      if (!items || items.length === 0) {
+      const data = (await res.json()) as InvidiousResult[];
+      const video = data.find((i) => i.type === 'video');
+      if (!video) {
         lastError = `${api} returned no results`;
         continue;
       }
-      return `https://www.youtube.com${items[0].url}`;
+      console.log(`Found: ${video.title} (${video.videoId}) via ${api}`);
+      return `https://www.youtube.com/watch?v=${video.videoId}`;
     } catch (err) {
       lastError = `${api} failed: ${err instanceof Error ? err.message : 'unknown'}`;
       continue;
