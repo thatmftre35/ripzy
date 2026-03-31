@@ -1,13 +1,23 @@
 const PIPED_API = 'https://pipedapi.kavin.rocks';
 const COBALT_API = 'https://api.cobalt.tools';
 
+interface PipedResult {
+  items?: Array<{ type: string; url: string }>;
+}
+
+interface CobaltResult {
+  status: string;
+  url?: string;
+  error?: { code?: string };
+}
+
 async function searchYouTube(query: string): Promise<string> {
   const res = await fetch(`${PIPED_API}/search?q=${encodeURIComponent(query)}&filter=music_songs`);
   if (!res.ok) {
     throw new Error(`YouTube search failed: ${res.status}`);
   }
-  const data = await res.json();
-  const items = data.items?.filter((i: any) => i.type === 'stream');
+  const data: PipedResult = await res.json();
+  const items = data.items?.filter((i) => i.type === 'stream');
   if (!items || items.length === 0) {
     throw new Error('No results found');
   }
@@ -37,7 +47,7 @@ export async function convertToMp3(title: string, artist: string): Promise<Buffe
     throw new Error(`Cobalt API error: ${cobaltRes.status} ${text}`);
   }
 
-  const cobaltData = await cobaltRes.json();
+  const cobaltData: CobaltResult = await cobaltRes.json();
 
   if (cobaltData.status === 'error') {
     throw new Error(`Cobalt error: ${cobaltData.error?.code || 'unknown'}`);
