@@ -1,11 +1,9 @@
 import { spawn } from 'child_process';
-import { Readable } from 'stream';
 
-export function convertToMp3(title: string, artist: string): Promise<Readable> {
+export function convertToMp3(title: string, artist: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const query = `${title} ${artist} audio`;
 
-    // yt-dlp searches YouTube, extracts audio, pipes to ffmpeg for MP3 conversion
     const ytdlp = spawn('yt-dlp', [
       `ytsearch1:${query}`,
       '--no-playlist',
@@ -26,7 +24,12 @@ export function convertToMp3(title: string, artist: string): Promise<Readable> {
 
     ytdlp.stdout.pipe(ffmpeg.stdin);
 
+    const chunks: Buffer[] = [];
     let errorOutput = '';
+
+    ffmpeg.stdout.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
 
     ytdlp.stderr.on('data', (data) => {
       errorOutput += data.toString();
@@ -44,19 +47,13 @@ export function convertToMp3(title: string, artist: string): Promise<Readable> {
       reject(new Error(`ffmpeg not found: ${err.message}`));
     });
 
-    ytdlp.on('close', (code) => {
-      if (code !== 0 && code !== null) {
-        // Don't reject here - ffmpeg might still be processing
-      }
-    });
-
     ffmpeg.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`Conversion failed: ${errorOutput}`));
+      const buffer = Buffer.concat(chunks);
+      if (code !== 0 || buffer.length === 0) {
+        reject(new Error(`Conversion failed (code ${code}): ${errorOutput || 'empty output'}`));
+      } else {
+        resolve(buffer);
       }
     });
-
-    // Resolve with the ffmpeg output stream immediately
-    resolve(ffmpeg.stdout);
   });
 }
