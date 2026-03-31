@@ -1,59 +1,63 @@
-import { spawn } from 'child_process';
+const PIPED_API = 'https://pipedapi.kavin.rocks';
+const COBALT_API = 'https://api.cobalt.tools';
 
-export function convertToMp3(title: string, artist: string): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const query = `${title} ${artist} audio`;
+async function searchYouTube(query: string): Promise<string> {
+  const res = await fetch(`${PIPED_API}/search?q=${encodeURIComponent(query)}&filter=music_songs`);
+  if (!res.ok) {
+    throw new Error(`YouTube search failed: ${res.status}`);
+  }
+  const data = await res.json();
+  const items = data.items?.filter((i: any) => i.type === 'stream');
+  if (!items || items.length === 0) {
+    throw new Error('No results found');
+  }
+  return `https://www.youtube.com${items[0].url}`;
+}
 
-    const ytdlp = spawn('yt-dlp', [
-      `ytsearch1:${query}`,
-      '--no-playlist',
-      '-f', 'bestaudio',
-      '-o', '-',
-      '--quiet',
-      '--no-warnings',
-    ]);
+export async function convertToMp3(title: string, artist: string): Promise<Buffer> {
+  const query = `${title} ${artist}`;
+  const videoUrl = await searchYouTube(query);
 
-    const ffmpeg = spawn('ffmpeg', [
-      '-i', 'pipe:0',
-      '-f', 'mp3',
-      '-ab', '192k',
-      '-vn',
-      '-loglevel', 'error',
-      'pipe:1',
-    ]);
-
-    ytdlp.stdout.pipe(ffmpeg.stdin);
-
-    const chunks: Buffer[] = [];
-    let errorOutput = '';
-
-    ffmpeg.stdout.on('data', (chunk) => {
-      chunks.push(chunk);
-    });
-
-    ytdlp.stderr.on('data', (data) => {
-      errorOutput += data.toString();
-    });
-
-    ffmpeg.stderr.on('data', (data) => {
-      errorOutput += data.toString();
-    });
-
-    ytdlp.on('error', (err) => {
-      reject(new Error(`yt-dlp not found: ${err.message}`));
-    });
-
-    ffmpeg.on('error', (err) => {
-      reject(new Error(`ffmpeg not found: ${err.message}`));
-    });
-
-    ffmpeg.on('close', (code) => {
-      const buffer = Buffer.concat(chunks);
-      if (code !== 0 || buffer.length === 0) {
-        reject(new Error(`Conversion failed (code ${code}): ${errorOutput || 'empty output'}`));
-      } else {
-        resolve(buffer);
-      }
-    });
+  const cobaltRes = await fetch(COBALT_API, {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      url: videoUrl,
+      downloadMode: 'audio',
+      audioFormat: 'mp3',
+      audioBitrate: '128',
+    }),
   });
+
+  if (!cobaltRes.ok) {
+    const text = await cobaltRes.text();
+    throw new Error(`Cobalt API error: ${cobaltRes.status} ${text}`);
+  }
+
+  const cobaltData = await cobaltRes.json();
+
+  if (cobaltData.status === 'error') {
+    throw new Error(`Cobalt error: ${cobaltData.error?.code || 'unknown'}`);
+  }
+
+  if (cobaltData.status !== 'tunnel' && cobaltData.status !== 'redirect') {
+    throw new Error(`Unexpected Cobalt response: ${cobaltData.status}`);
+  }
+
+  const audioRes = await fetch(cobaltData.url);
+  if (!audioRes.ok) {
+    throw new Error(`Failed to download audio: ${audioRes.status}`);
+  }
+
+  const arrayBuffer = await audioRes.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  if (buffer.length === 0) {
+    throw new Error('Downloaded audio is empty');
+  }
+
+  return buffer;
 }
