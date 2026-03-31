@@ -1,7 +1,6 @@
 import { Playlist, Track } from './types';
 
-// TODO: Replace with your Render deployment URL
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://ripzy.onrender.com';
 
 interface SpotifyPlaylistResponse {
   playlist: {
