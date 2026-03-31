@@ -1,4 +1,8 @@
-const PIPED_API = 'https://pipedapi.kavin.rocks';
+const PIPED_INSTANCES = [
+  'https://pipedapi.kavin.rocks',
+  'https://pipedapi.adminforge.de',
+  'https://pipedapi.leptons.xyz',
+];
 const COBALT_API = 'https://api.cobalt.tools';
 
 interface PipedResult {
@@ -12,16 +16,29 @@ interface CobaltResult {
 }
 
 async function searchYouTube(query: string): Promise<string> {
-  const res = await fetch(`${PIPED_API}/search?q=${encodeURIComponent(query)}&filter=music_songs`);
-  if (!res.ok) {
-    throw new Error(`YouTube search failed: ${res.status}`);
+  let lastError = '';
+
+  for (const api of PIPED_INSTANCES) {
+    try {
+      const res = await fetch(`${api}/search?q=${encodeURIComponent(query)}&filter=music_songs`);
+      if (!res.ok) {
+        lastError = `${api} returned ${res.status}`;
+        continue;
+      }
+      const data = (await res.json()) as PipedResult;
+      const items = data.items?.filter((i) => i.type === 'stream');
+      if (!items || items.length === 0) {
+        lastError = `${api} returned no results`;
+        continue;
+      }
+      return `https://www.youtube.com${items[0].url}`;
+    } catch (err) {
+      lastError = `${api} failed: ${err instanceof Error ? err.message : 'unknown'}`;
+      continue;
+    }
   }
-  const data = (await res.json()) as PipedResult;
-  const items = data.items?.filter((i) => i.type === 'stream');
-  if (!items || items.length === 0) {
-    throw new Error('No results found');
-  }
-  return `https://www.youtube.com${items[0].url}`;
+
+  throw new Error(`YouTube search failed on all instances: ${lastError}`);
 }
 
 export async function convertToMp3(title: string, artist: string): Promise<Buffer> {
