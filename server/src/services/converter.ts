@@ -16,7 +16,7 @@ async function searchYouTube(query: string): Promise<string> {
   if (!res.ok) {
     throw new Error(`YouTube search failed: ${res.status}`);
   }
-  const data: PipedResult = await res.json();
+  const data = (await res.json()) as PipedResult;
   const items = data.items?.filter((i) => i.type === 'stream');
   if (!items || items.length === 0) {
     throw new Error('No results found');
@@ -47,7 +47,7 @@ export async function convertToMp3(title: string, artist: string): Promise<Buffe
     throw new Error(`Cobalt API error: ${cobaltRes.status} ${text}`);
   }
 
-  const cobaltData: CobaltResult = await cobaltRes.json();
+  const cobaltData = (await cobaltRes.json()) as CobaltResult;
 
   if (cobaltData.status === 'error') {
     throw new Error(`Cobalt error: ${cobaltData.error?.code || 'unknown'}`);
@@ -55,6 +55,10 @@ export async function convertToMp3(title: string, artist: string): Promise<Buffe
 
   if (cobaltData.status !== 'tunnel' && cobaltData.status !== 'redirect') {
     throw new Error(`Unexpected Cobalt response: ${cobaltData.status}`);
+  }
+
+  if (!cobaltData.url) {
+    throw new Error('No download URL returned from Cobalt');
   }
 
   const audioRes = await fetch(cobaltData.url);
