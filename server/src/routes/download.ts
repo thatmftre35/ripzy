@@ -4,19 +4,20 @@ import { convertToMp3 } from '../services/converter';
 export const downloadRouter = Router();
 
 downloadRouter.get('/download', async (req, res) => {
-  const { title, artist } = req.query;
+  const { videoId } = req.query;
 
-  if (!title || !artist) {
-    res.status(400).json({ error: 'title and artist are required' });
+  if (!videoId) {
+    res.status(400).json({ error: 'videoId is required' });
     return;
   }
 
   try {
-    const buffer = await convertToMp3(title as string, artist as string);
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const buffer = await convertToMp3(videoUrl);
 
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Content-Length', buffer.length);
-    res.setHeader('Content-Disposition', `attachment; filename="track.mp3"`);
+    res.setHeader('Content-Disposition', 'attachment; filename="track.mp3"');
     res.send(buffer);
   } catch (err) {
     console.error('Download error:', err);

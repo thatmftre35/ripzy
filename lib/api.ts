@@ -1,5 +1,3 @@
-import { Playlist, Track } from './types';
-
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://ripzy.onrender.com';
 
 interface SpotifyPlaylistResponse {
@@ -28,7 +26,6 @@ export async function fetchPlaylist(spotifyId: string): Promise<SpotifyPlaylistR
   return response.json();
 }
 
-export function getDownloadUrl(title: string, artist: string): string {
-  const params = new URLSearchParams({ title, artist });
-  return `${API_BASE}/api/download?${params.toString()}`;
+export function getDownloadUrl(videoId: string): string {
+  return `${API_BASE}/api/download?videoId=${encodeURIComponent(videoId)}`;
 }
