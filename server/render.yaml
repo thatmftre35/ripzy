@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: ripzy-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: SPOTIFY_CLIENT_ID
+        sync: false
+      - key: SPOTIFY_CLIENT_SECRET
+        sync: false
+      - key: PORT
+        value: 3001

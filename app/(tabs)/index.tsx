@@ -1,98 +1,131 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useState, useCallback } from 'react';
+import {
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  View,
+  RefreshControl,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { PlaylistCard } from '@/components/playlist-card';
+import { AddPlaylistSheet } from '@/components/add-playlist-sheet';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useStore } from '@/lib/store';
+import { Playlist } from '@/lib/types';
 
-export default function HomeScreen() {
+export default function LibraryScreen() {
+  const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
+  const router = useRouter();
+  const playlists = useStore((s) => s.playlists);
+  const [showAddSheet, setShowAddSheet] = useState(false);
+
+  const handlePlaylistPress = useCallback(
+    (playlist: Playlist) => {
+      router.push(`/playlist/${playlist.id}` as any);
+    },
+    [router]
+  );
+
+  const handlePlaylistAdded = useCallback(() => {
+    setShowAddSheet(false);
+  }, []);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.header}>
+        <ThemedText style={styles.title}>Ripzy</ThemedText>
+      </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      {playlists.length === 0 ? (
+        <View style={styles.emptyState}>
+          <ThemedText style={[styles.emptyText, { color: colors.textSecondary }]}>
+            No playlists yet
+          </ThemedText>
+          <ThemedText style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+            Tap + to add a Spotify playlist
+          </ThemedText>
+        </View>
+      ) : (
+        <FlatList
+          data={playlists}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <PlaylistCard playlist={item} onPress={() => handlePlaylistPress(item)} />
+          )}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: colors.text }]}
+        onPress={() => setShowAddSheet(true)}
+        activeOpacity={0.8}
+      >
+        <ThemedText style={[styles.fabText, { color: colors.background }]}>+</ThemedText>
+      </TouchableOpacity>
+
+      <AddPlaylistSheet
+        visible={showAddSheet}
+        onClose={() => setShowAddSheet(false)}
+        onAdded={handlePlaylistAdded}
+      />
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+  },
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  title: {
+    fontSize: 40,
+    fontWeight: '700',
+    letterSpacing: -1,
+  },
+  list: {
+    paddingHorizontal: 24,
+    paddingBottom: 120,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    paddingBottom: 100,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '500',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  emptySubtext: {
+    fontSize: 14,
+    marginTop: 8,
+  },
+  fab: {
     position: 'absolute',
+    bottom: 100,
+    alignSelf: 'center',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fabText: {
+    fontSize: 28,
+    fontWeight: '300',
+    marginTop: -2,
   },
 });
